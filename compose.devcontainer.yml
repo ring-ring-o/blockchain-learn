@@ -1,0 +1,12 @@
+version: "3"
+
+services:
+  blockchain-workspace:
+    build:
+      context: .
+      dockerfile: "./.devcontainer/dockerfile"
+    volumes:
+      - type: bind
+        source: ./
+        target: /home/vscode/workspaces/
+    tty: true
