@@ -1,8 +1,13 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+import urllib
+import urllib.parse
+
+import requests
+from fastapi import FastAPI, Request, status
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 
-from wallet import Wallet
+from models import PostTransactionRequest, PostWalletTransactionRequest, Transaction
+from wallet import Singature, Wallet
 
 app = FastAPI()
 app.state.gateway = 8080
@@ -22,6 +27,61 @@ def create_wallet():
         "public_key": my_wallet.public_key,
         "blockchain_address": my_wallet.blockchain_address,
     }
+
+
+@app.post("/transactions")
+def create_transactions(body: PostWalletTransactionRequest):
+    signature = Singature(
+        sender_private_key=body.sender_private_key,
+        sender_public_key=body.sender_public_key,
+        transaction=Transaction(
+            sender_blockchain_address=body.sender_blockchain_address,
+            recipient_blockchain_address=body.recipient_blockchain_address,
+            value=body.value,
+        ),
+    )
+
+    api_body = PostTransactionRequest(
+        sender_blockchain_address=body.sender_blockchain_address,
+        recipient_blockchain_address=body.recipient_blockchain_address,
+        value=body.value,
+        sender_public_key=body.sender_public_key,
+        signature=signature.generate_signature(),
+    )
+    response = requests.post(
+        urllib.parse.urljoin(app.state.gateway, "/post_transactions"),
+        json=api_body.model_dump(),
+        timeout=10,
+    )
+
+    if response.status_code == status.HTTP_201_CREATED:
+        return JSONResponse({"message": "success"}, status_code=status.HTTP_201_CREATED)
+
+    return JSONResponse(
+        {"message": "fail", "response": response.text},
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
+
+
+app.get("/wallet/amount")
+
+
+def calcutate_amount(blockchain_address: str):
+    my_blockchain_address = blockchain_address
+    response = requests.get(
+        urllib.parse.urljoin(app.state.config, "amount"),
+        {"blockchain_address": my_blockchain_address},
+        timeout=3,
+    )
+
+    if response.status_code == 200:
+        total = response.json()["amount"]
+        return {"message": "success", "amount": total}
+
+    return JSONResponse(
+        {"message": "fail", "error": response.content},
+        status_code=status.HTTP_400_BAD_REQUEST,
+    )
 
 
 if __name__ == "__main__":

@@ -16,3 +16,13 @@ class Block(BaseModel):
 
 class BlockChainCache(BaseModel):
     blockchain: Block | None = None
+
+
+class PostTransactionRequest(Transaction):
+    sender_public_key: str
+    signature: str
+
+
+class PostWalletTransactionRequest(Transaction):
+    sender_private_key: str
+    sender_public_key: str
